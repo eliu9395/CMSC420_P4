@@ -1,0 +1,7 @@
+initialize,cycle,2
+insert_standard,4,5,ZWS
+insert_standard,6,9,XOP
+insert_standard,8,5,EAB
+delete,4,5
+insert_standard,8,2,JUM
+dump

@@ -1,0 +1,7 @@
+initialize,cycle,2
+insert_standard,3,1,YSZ
+insert_standard,10,4,XTG
+insert_standard,9,2,KDD
+insert_standard,7,4,NQZ
+insert_standard,3,10,DFW
+dump

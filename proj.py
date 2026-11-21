@@ -87,19 +87,136 @@ class EKDtree():
         else:
             print("No Tree!")
 
-    def insert_standard(self,datum:Datum):
-        dummy = True
 
-    def insert_nonstandard(self,datum:Datum):
-        dummy = True
 
-    def delete(self,point:Point):
-        dummy = True
+    @staticmethod
+    def _bb_points(data):
+        xs = [d.point.x for d in data]
+        ys = [d.point.y for d in data]
+        return BoundingBox(min(xs), max(xs), min(ys), max(ys))
 
-    def knn_query(self,point:Point,k:int) -> str:
-        metric = 0
-        knnlist = []
-        return(json.dumps({"metric":metric,"points":[str(datum.to_json()) for datum in knnlist]},indent=2))
+    @staticmethod
+    def _bb_union(a, b):
+        return BoundingBox(min(a.xmin, b.xmin), max(a.xmax, b.xmax), min(a.ymin, b.ymin), max(a.ymax, b.ymax))
+
+    def _choose_dim(self, data, parent_dim):
+        if self.splitmethod == 'cycle':
+            if parent_dim is None:
+                return 'x'
+            return 'y' if parent_dim == 'x' else 'x'
+        nx = len({d.point.x for d in data})
+        ny = len({d.point.y for d in data})
+        return 'y' if ny > nx else 'x'
+
+    def _split_leaf(self, leaf, parent_dim):
+        dim = self._choose_dim(leaf.data, parent_dim)
+        if dim == 'x':
+            key = lambda d: (d.point.x, d.point.y)
+            val = lambda d: d.point.x
+        else:
+            key = lambda d: (d.point.y, d.point.x)
+            val = lambda d: d.point.y
+        pts = sorted(leaf.data, key=key)
+        n = len(pts)
+        mid = n // 2
+        left, right = pts[:mid], pts[mid:]
+        if n % 2 == 1:
+            value = float(val(pts[mid]))
+        else:
+            value = (val(pts[mid - 1]) + val(pts[mid])) / 2
+        l = NodeLeaf(left, self._bb_points(left))
+        r = NodeLeaf(right, self._bb_points(right))
+        return NodeInternal(dim, value, l, r, self._bb_union(l.boundingbox, r.boundingbox))
+
+    def _insert(self, node, datum, parent_dim, nonstandard):
+        if isinstance(node, NodeLeaf):
+            node.data.append(datum)
+            node.boundingbox = self._bb_points(node.data)
+            if len(node.data) > self.m:
+                return self._split_leaf(node, parent_dim)
+            return node
+        val = datum.point.x if node.splitcoord == 'x' else datum.point.y
+        if val <= node.splitvalue:
+            node.leftchild = self._insert(node.leftchild, datum, node.splitcoord, nonstandard)
+        else:
+            node.rightchild = self._insert(node.rightchild, datum, node.splitcoord, nonstandard)
+        lb, rb = node.leftchild.boundingbox, node.rightchild.boundingbox
+        node.boundingbox = self._bb_union(lb, rb)
+        if nonstandard:
+            if node.splitcoord == 'x':
+                node.splitvalue = (lb.xmax + rb.xmin) / 2
+            else:
+                node.splitvalue = (lb.ymax + rb.ymin) / 2
+        return node
+
+    def _do_insert(self, datum, nonstandard):
+        if self.root is None:
+            self.root = NodeLeaf([datum], self._bb_points([datum]))
+        else:
+            self.root = self._insert(self.root, datum, None, nonstandard)
+
+    def insert_standard(self, datum: Datum):
+        self._do_insert(datum, False)
+
+    def insert_nonstandard(self, datum: Datum):
+        self._do_insert(datum, True)
+
+    def _delete(self, node, p):
+        if isinstance(node, NodeLeaf):
+            for i, d in enumerate(node.data):
+                if d.point.x == p.x and d.point.y == p.y:
+                    del node.data[i]
+                    if not node.data:
+                        return None, True
+                    node.boundingbox = self._bb_points(node.data)
+                    return node, True
+            return node, False
+        for side in ('leftchild', 'rightchild'):
+            child = getattr(node, side)
+            bb = child.boundingbox
+            if bb.xmin <= p.x <= bb.xmax and bb.ymin <= p.y <= bb.ymax:
+                new, found = self._delete(child, p)
+                if found:
+                    if new is None:
+                        return (node.rightchild if side == 'leftchild' else node.leftchild), True
+                    setattr(node, side, new)
+                    node.boundingbox = self._bb_union(node.leftchild.boundingbox, node.rightchild.boundingbox)
+                    return node, True
+        return node, False
+
+    def delete(self, point: Point):
+        if self.root is None:
+            return
+        self.root, _ = self._delete(self.root, point)
+
+    def knn_query(self, point: Point, k: int) -> str:
+        best = []
+        visited = [0]
+
+        def bbdist2(bb):
+            dx = max(bb.xmin - point.x, 0, point.x - bb.xmax)
+            dy = max(bb.ymin - point.y, 0, point.y - bb.ymax)
+            return dx * dx + dy * dy
+
+        def recurse(node):
+            if isinstance(node, NodeLeaf):
+                for d in node.data:
+                    dx, dy = d.point.x - point.x, d.point.y - point.y
+                    best.append((dx * dx + dy * dy, d.code, d))
+                best.sort(key=lambda t: (t[0], t[1]))
+                del best[k:]
+                return
+            visited[0] += 1
+            kids = sorted([node.leftchild, node.rightchild], key=lambda n: bbdist2(n.boundingbox))
+            for c in kids:
+                if len(best) >= k and bbdist2(c.boundingbox) > best[-1][0]:
+                    continue
+                recurse(c)
+
+        if self.root is not None and k > 0:
+            recurse(self.root)
+        metric = visited[0]
+        return json.dumps({"metric": metric, "points": [str(t[2].to_json()) for t in best]}, indent=2)
 
     # Draw a picture of the points and bounding boxes.
     # You will need to install matplotlib to use this.

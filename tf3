@@ -1,0 +1,7 @@
+initialize,cycle,2
+insert_standard,0,0,DFN
+insert_standard,20,20,EAA
+insert_standard,40,20,HEK
+insert_standard,60,40,ZDU
+insert_standard,40,40,TPB
+knn_query,40,30,2

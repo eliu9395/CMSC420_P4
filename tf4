@@ -1,0 +1,7 @@
+initialize,custom,2
+insert_nonstandard,5,0,SFE
+insert_nonstandard,0,2,FNH
+insert_nonstandard,7,5,TNO
+insert_nonstandard,2,10,AUW
+insert_nonstandard,6,3,CGR
+dump
