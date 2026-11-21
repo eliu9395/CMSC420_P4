@@ -128,6 +128,28 @@ class EKDtree():
         r = NodeLeaf(right, self._bb_points(right))
         return NodeInternal(dim, value, l, r, self._bb_union(l.boundingbox, r.boundingbox))
 
+    def _goes_left(self, node, datum):
+        val = datum.point.x if node.splitcoord == 'x' else datum.point.y
+        if val == node.splitvalue:
+            return val % 2 == 0          # tie: even -> left, odd -> right
+        return val < node.splitvalue
+
+    def _redistribute(self, node, datum):
+        pts = node.leftchild.data + node.rightchild.data + [datum]
+        if node.splitcoord == 'x':
+            key = lambda d: (d.point.x, d.point.y)
+            val = lambda d: d.point.x
+        else:
+            key = lambda d: (d.point.y, d.point.x)
+            val = lambda d: d.point.y
+        pts.sort(key=key)
+        mid = len(pts) // 2
+        left, right = pts[:mid], pts[mid:]
+        node.splitvalue = (val(left[-1]) + val(right[0])) / 2
+        node.leftchild = NodeLeaf(left, self._bb_points(left))
+        node.rightchild = NodeLeaf(right, self._bb_points(right))
+        node.boundingbox = self._bb_union(node.leftchild.boundingbox, node.rightchild.boundingbox)
+
     def _insert(self, node, datum, parent_dim, nonstandard):
         if isinstance(node, NodeLeaf):
             node.data.append(datum)
@@ -135,18 +157,25 @@ class EKDtree():
             if len(node.data) > self.m:
                 return self._split_leaf(node, parent_dim)
             return node
-        val = datum.point.x if node.splitcoord == 'x' else datum.point.y
-        if val <= node.splitvalue:
-            node.leftchild = self._insert(node.leftchild, datum, node.splitcoord, nonstandard)
+
+        go_left = self._goes_left(node, datum)
+        child = node.leftchild if go_left else node.rightchild
+        sibling = node.rightchild if go_left else node.leftchild
+
+        # nonstandard: if the target leaf is full and its sibling leaf has room,
+        # rebalance across this node's split instead of creating a new split
+        if (nonstandard and isinstance(child, NodeLeaf) and isinstance(sibling, NodeLeaf)
+                and len(child.data) >= self.m and len(sibling.data) < self.m):
+            self._redistribute(node, datum)
+            return node
+
+        new = self._insert(child, datum, node.splitcoord, nonstandard)
+        if go_left:
+            node.leftchild = new
         else:
-            node.rightchild = self._insert(node.rightchild, datum, node.splitcoord, nonstandard)
-        lb, rb = node.leftchild.boundingbox, node.rightchild.boundingbox
-        node.boundingbox = self._bb_union(lb, rb)
-        if nonstandard:
-            if node.splitcoord == 'x':
-                node.splitvalue = (lb.xmax + rb.xmin) / 2
-            else:
-                node.splitvalue = (lb.ymax + rb.ymin) / 2
+            node.rightchild = new
+        node.boundingbox = self._bb_union(node.leftchild.boundingbox,
+                                          node.rightchild.boundingbox)
         return node
 
     def _do_insert(self, datum, nonstandard):
