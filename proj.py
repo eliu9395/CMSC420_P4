@@ -131,7 +131,7 @@ class EKDtree():
     def _goes_left(self, node, datum):
         val = datum.point.x if node.splitcoord == 'x' else datum.point.y
         if val == node.splitvalue:
-            return val % 2 == 0          # tie: even -> left, odd -> right
+            return val % 2 == 0
         return val < node.splitvalue
 
     def _redistribute(self, node, datum):
@@ -162,10 +162,7 @@ class EKDtree():
         child = node.leftchild if go_left else node.rightchild
         sibling = node.rightchild if go_left else node.leftchild
 
-        # nonstandard: if the target leaf is full and its sibling leaf has room,
-        # rebalance across this node's split instead of creating a new split
-        if (nonstandard and isinstance(child, NodeLeaf) and isinstance(sibling, NodeLeaf)
-                and len(child.data) >= self.m and len(sibling.data) < self.m):
+        if (nonstandard and isinstance(child, NodeLeaf) and isinstance(sibling, NodeLeaf) and len(child.data) >= self.m and len(sibling.data) < self.m):
             self._redistribute(node, datum)
             return node
 
@@ -174,8 +171,7 @@ class EKDtree():
             node.leftchild = new
         else:
             node.rightchild = new
-        node.boundingbox = self._bb_union(node.leftchild.boundingbox,
-                                          node.rightchild.boundingbox)
+        node.boundingbox = self._bb_union(node.leftchild.boundingbox, node.rightchild.boundingbox)
         return node
 
     def _do_insert(self, datum, nonstandard):
