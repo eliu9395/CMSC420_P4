@@ -162,7 +162,10 @@ class EKDtree():
         child = node.leftchild if go_left else node.rightchild
         sibling = node.rightchild if go_left else node.leftchild
 
-        if (nonstandard and isinstance(child, NodeLeaf) and isinstance(sibling, NodeLeaf) and len(child.data) >= self.m and len(sibling.data) < self.m):
+        # if (nonstandard and isinstance(child, NodeLeaf) and isinstance(sibling, NodeLeaf) and len(child.data) >= self.m and len(sibling.data) < self.m):
+        #     self._redistribute(node, datum)
+        #     return node
+        if (nonstandard and isinstance(child, NodeLeaf) and isinstance(sibling, NodeLeaf) and len(child.data) + len(sibling.data) + 1 <= 2 * self.m):
             self._redistribute(node, datum)
             return node
 
@@ -232,7 +235,16 @@ class EKDtree():
                 del best[k:]
                 return
             visited[0] += 1
-            kids = sorted([node.leftchild, node.rightchild], key=lambda n: bbdist2(n.boundingbox))
+            # kids = sorted([node.leftchild, node.rightchild], key=lambda n: bbdist2(n.boundingbox))
+            l, r = node.leftchild, node.rightchild
+            dl, dr = bbdist2(l.boundingbox), bbdist2(r.boundingbox)
+            if dl != dr:
+                kids = [l, r] if dl < dr else [r, l]
+            elif node.splitvalue % 2 == 0:
+                kids = [l, r]
+            else:
+                kids = [r, l]
+
             for c in kids:
                 if len(best) >= k and bbdist2(c.boundingbox) > best[-1][0]:
                     continue
