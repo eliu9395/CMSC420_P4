@@ -1,6 +1,7 @@
 # EKD Variant 1
 # AI Usage:
 # Write details about how you used AI for this project.
+# AI was used to get a starting point, and fix errors in my code
 
 from __future__ import annotations
 import os
@@ -134,18 +135,34 @@ class EKDtree():
             return val % 2 == 0
         return val < node.splitvalue
 
+    # def _redistribute(self, node, datum):
+    #     pts = node.leftchild.data + node.rightchild.data + [datum]
+    #     if node.splitcoord == 'x':
+    #         key = lambda d: (d.point.x, d.point.y)
+    #         val = lambda d: d.point.x
+    #     else:
+    #         key = lambda d: (d.point.y, d.point.x)
+    #         val = lambda d: d.point.y
+    #     pts.sort(key=key)
+    #     mid = len(pts) // 2
+    #     left, right = pts[:mid], pts[mid:]
+    #     node.splitvalue = (val(left[-1]) + val(right[0])) / 2
+    #     node.leftchild = NodeLeaf(left, self._bb_points(left))
+    #     node.rightchild = NodeLeaf(right, self._bb_points(right))
+    #     node.boundingbox = self._bb_union(node.leftchild.boundingbox, node.rightchild.boundingbox)
     def _redistribute(self, node, datum):
         pts = node.leftchild.data + node.rightchild.data + [datum]
-        if node.splitcoord == 'x':
-            key = lambda d: (d.point.x, d.point.y)
-            val = lambda d: d.point.x
+        dim = node.splitcoord
+        if dim == 'x':
+            pts.sort(key=lambda d: (d.point.x, d.point.y)); val = lambda d: d.point.x
         else:
-            key = lambda d: (d.point.y, d.point.x)
-            val = lambda d: d.point.y
-        pts.sort(key=key)
-        mid = len(pts) // 2
+            pts.sort(key=lambda d: (d.point.y, d.point.x)); val = lambda d: d.point.y
+        n = len(pts); mid = n // 2
         left, right = pts[:mid], pts[mid:]
-        node.splitvalue = (val(left[-1]) + val(right[0])) / 2
+        if n % 2 == 1:
+            node.splitvalue = float(val(pts[mid]))
+        else:
+            node.splitvalue = (val(pts[mid - 1]) + val(pts[mid])) / 2
         node.leftchild = NodeLeaf(left, self._bb_points(left))
         node.rightchild = NodeLeaf(right, self._bb_points(right))
         node.boundingbox = self._bb_union(node.leftchild.boundingbox, node.rightchild.boundingbox)
@@ -243,7 +260,8 @@ class EKDtree():
             elif node.splitvalue % 2 == 0:
                 kids = [l, r]
             else:
-                kids = [r, l]
+                # kids = [r, l]
+                kids = [r, l] if node.splitvalue % 2 == 0 else [l, r]
 
             for c in kids:
                 if len(best) >= k and bbdist2(c.boundingbox) > best[-1][0]:
