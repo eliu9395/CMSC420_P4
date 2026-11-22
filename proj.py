@@ -255,13 +255,7 @@ class EKDtree():
             # kids = sorted([node.leftchild, node.rightchild], key=lambda n: bbdist2(n.boundingbox))
             l, r = node.leftchild, node.rightchild
             dl, dr = bbdist2(l.boundingbox), bbdist2(r.boundingbox)
-            if dl != dr:
-                kids = [l, r] if dl < dr else [r, l]
-            elif node.splitvalue % 2 == 0:
-                kids = [l, r]
-            else:
-                # kids = [r, l]
-                kids = [r, l] if node.splitvalue % 2 == 0 else [l, r]
+            kids = [l, r] if dl < dr else [r, l]
 
             for c in kids:
                 if len(best) >= k and bbdist2(c.boundingbox) > best[-1][0]:
